@@ -1,17 +1,23 @@
 # oldi-simulator
 
+Lightweight latency/distribution simulator for testing and performance analysis.
+
+## Quick start
+
+Initialize modules (first run):
 ```bash
+go mod init oldi-simulator
+echo "replace github.com/dfquaresma/oldi-simulator => ./" >> go.mod
 go mod tidy
 ```
 
+Build:
 ```bash
-go mod init oldi-simulator
+go build ./...
 ```
 
+To run the Latency Model:
 ```bash
-go get github.com/dfquaresma/oldi-simulator@commit-hash
-```
-
-```bash
-go build
+cd /latency_model/
+go run main.go
 ```

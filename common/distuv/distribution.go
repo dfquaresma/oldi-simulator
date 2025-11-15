@@ -10,7 +10,6 @@ import (
 )
 
 type Distribution struct {
-	name         string
 	dist         string
 	latency      float64
 	tail_latency float64
@@ -25,7 +24,6 @@ func NewDistribution(name, dist string) *Distribution {
 	switch dist {
 	case "constant":
 		return &Distribution{
-			name:    name,
 			dist:    dist,
 			latency: getDistMetric(name, dist, "latency"),
 		}
@@ -79,8 +77,6 @@ func (d *Distribution) NextValue() float64 {
 
 func (d *Distribution) GetPercentile(p float64) float64 {
 	switch d.dist {
-	case "poisson":
-		return d.ps.Quantile(p)
 	case "weibull":
 		return d.wb.Quantile(p)
 	case "lognormal":
