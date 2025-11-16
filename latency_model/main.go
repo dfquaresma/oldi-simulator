@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 	"strconv"
 	"time"
 
@@ -33,7 +32,7 @@ func main() {
 			"func",
 			"end_timestamp",
 			"response_time",
-			"total_time_running_functions",
+			"system_load",
 			"service_time",
 			"copy_service_time",
 			"delay",
@@ -76,16 +75,31 @@ func generate(requests_count int, f, interarrival_distname, servicetime_distname
 		service_time := servicetime_dist.NextValue()
 		copy_service_time := servicetime_dist.NextValue()
 
-		workload = append(workload, getBaseline(service_time, ts, generated_app, generated_func))
+		workload = append(
+			workload,
+			getBaseline(service_time, ts, generated_app, generated_func),
+			hedge{
+				name:         "naive_hedge",
+				delay:        0,
+				cancellation: false,
+			}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
+			hedge{
+				name:         "delayed_hedge_p95wc",
+				delay:        interarrival_dist.GetPercentile(0.95),
+				cancellation: true,
+			}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
+			hedge{
+				name:         "perfect_hedge",
+				precision:    1,
+				cancellation: true,
+			}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
+		)
 
-		// Hedged Requests with Cancellation
-		workload = append(workload, getHedgedRequestNoDelay(service_time, copy_service_time, ts, generated_app, generated_func))
-		workload = append(workload, getHedgedRequestDelayP95(servicetime_dist, service_time, copy_service_time, ts, generated_app, generated_func))
-		workload = append(workload, getPerfectHedgedRequest(service_time, copy_service_time, ts, generated_app, generated_func))
+		workload = append(
+			workload,
+			getAssistedHedges(generated_app, generated_func, ts, service_time, copy_service_time)...,
+		)
 
-		// Naive Hedged Requests without Cancellation
-		workload = append(workload, getNaiveHedgedNoDelay(service_time, copy_service_time, ts, generated_app, generated_func))
-		workload = append(workload, getDelayedNaiveHedged(servicetime_dist, service_time, copy_service_time, ts, generated_app, generated_func))
 	}
 	return workload
 }
@@ -107,71 +121,17 @@ func getBaseline(service_time, ts float64, generated_app, generated_func string)
 	}
 }
 
-func getHedgedRequestNoDelay(service_time, copy_service_time, ts float64, generated_app, generated_func string) []string {
-	return getHedgedRequest(service_time, copy_service_time, 0.0, ts, "hedged_requests_nodelay", generated_app, generated_func)
-}
-
-func getHedgedRequestDelayP95(servicetime_dist *distuv.Distribution, service_time, copy_service_time, ts float64, generated_app, generated_func string) []string {
-	p95 := servicetime_dist.GetPercentile(0.95)
-	return getHedgedRequest(service_time, copy_service_time, p95, ts, "hedged_requests_p95", generated_app, generated_func)
-}
-
-func getPerfectHedgedRequest(service_time, copy_service_time, ts float64, generated_app, generated_func string) []string {
-	// hedge with cancellation, but only consider copy if it is worth
-	delay := service_time + 1.0
-	if copy_service_time < service_time {
-		delay = 0.0 // if copy is faster, send it right away
-	}
-	return getHedgedRequest(service_time, copy_service_time, delay, ts, "perfect_hedged_requests", generated_app, generated_func)
-}
-
-func getHedgedRequest(service_time, copy_service_time, delay, ts float64, name, generated_app, generated_func string) []string {
-	// hedge with cancellation
-	response_time := math.Min(service_time, delay+copy_service_time)
-	end_timestamp := ts + response_time
-	total_time_running_functions := response_time
-	if response_time > delay {
-		delta := response_time - delay
-		total_time_running_functions = delay + 2*delta // add additinal time spent running function after delay up to first finish
-	}
-	return []string{
-		name,
-		generated_app,
-		generated_func,
-		strconv.FormatFloat(end_timestamp, 'f', -1, 64),
-		strconv.FormatFloat(response_time, 'f', -1, 64),
-		strconv.FormatFloat(total_time_running_functions, 'f', -1, 64),
-		strconv.FormatFloat(service_time, 'f', -1, 64),
-		strconv.FormatFloat(copy_service_time, 'f', -1, 64),
-		strconv.FormatFloat(delay, 'f', -1, 64),
-	}
-}
-
-func getNaiveHedgedNoDelay(service_time, copy_service_time, ts float64, generated_app, generated_func string) []string {
-	return getNaiveHedged(service_time, copy_service_time, 0, ts, "naive_hedge", generated_app, generated_func)
-}
-
-func getDelayedNaiveHedged(servicetime_dist *distuv.Distribution, service_time, copy_service_time, ts float64, generated_app, generated_func string) []string {
-	return getNaiveHedged(service_time, copy_service_time, servicetime_dist.GetPercentile(0.95), ts, "delayed_naive_hedge", generated_app, generated_func)
-}
-
-func getNaiveHedged(service_time, copy_service_time, delay, ts float64, name, generated_app, generated_func string) []string {
-	// hedge with no cancellation
-	response_time := math.Min(service_time, delay+copy_service_time)
-	end_timestamp := ts + response_time
-	total_time_running_functions := response_time
-	if response_time > delay {
-		total_time_running_functions = service_time + copy_service_time // if a second is sent, process both completely
-	}
-	return []string{
-		name,
-		generated_app,
-		generated_func,
-		strconv.FormatFloat(end_timestamp, 'f', -1, 64),
-		strconv.FormatFloat(response_time, 'f', -1, 64),
-		strconv.FormatFloat(total_time_running_functions, 'f', -1, 64),
-		strconv.FormatFloat(service_time, 'f', -1, 64),
-		strconv.FormatFloat(copy_service_time, 'f', -1, 64),
-		strconv.FormatFloat(delay, 'f', -1, 64),
+func getAssistedHedges(generated_app, generated_func string, ts, service_time, copy_service_time float64) [][]string {
+	return [][]string{
+		hedge{
+			name:         "assisted_hedge_90wc",
+			precision:    0.9,
+			cancellation: true,
+		}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
+		hedge{
+			name:         "assisted_hedge_90nc",
+			precision:    0.9,
+			cancellation: false,
+		}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
 	}
 }
