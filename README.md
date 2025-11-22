@@ -1,4 +1,4 @@
-# oldi-simulator
+# hedge
 
 Lightweight latency/distribution simulator for testing and performance analysis.
 
