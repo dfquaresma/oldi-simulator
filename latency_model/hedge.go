@@ -16,12 +16,52 @@ type hedge struct {
 	cancellation bool
 }
 
+func newHedge(name string, p95 float64) hedge {
+	switch name {
+	case "naive_hedge":
+		return hedge{
+			name:         "naive_hedge",
+			delay:        0,
+			cancellation: false,
+		}
+	case "delayed_hedge_p95wc":
+		return hedge{
+			name:         "delayed_hedge_p95wc",
+			delay:        p95,
+			cancellation: true,
+		}
+	case "perfect_hedge":
+		return hedge{
+			name:         "perfect_hedge",
+			delay:        p95,
+			cancellation: true,
+		}
+
+	case "assisted_hedge_90wc":
+		return hedge{
+			name:         "assisted_hedge_90wc",
+			precision:    0.9,
+			cancellation: true,
+		}
+
+	case "assisted_hedge_90nc":
+		return hedge{
+			name:         "assisted_hedge_90nc",
+			precision:    0.9,
+			cancellation: false,
+		}
+
+	default:
+		return hedge{}
+	}
+}
+
 func (h hedge) hedgedRequest(generated_app, generated_func string, ts, service_time, copy_service_time float64) []string {
 	delay := h.delay
 	isTailLatency := service_time >= tail_factor*copy_service_time
 
 	// perfect hedge always knows when to send the copy
-	if h.name == "perfect_hedged" {
+	if h.name == "perfect_hedge" {
 		// delaying beyond service_time to copy only if worth
 		delay = service_time + 1.0
 		if isTailLatency {

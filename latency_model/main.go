@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/dfquaresma/oldi-simulator/common/distuv"
-	"github.com/dfquaresma/oldi-simulator/common/io"
+	"github.com/dfquaresma/hedge/common/distuv"
+	"github.com/dfquaresma/hedge/common/io"
 )
 
 func main() {
@@ -78,28 +78,22 @@ func generate(requests_count int, f, interarrival_distname, servicetime_distname
 		workload = append(
 			workload,
 			getBaseline(service_time, ts, generated_app, generated_func),
-			hedge{
-				name:         "naive_hedge",
-				delay:        0,
-				cancellation: false,
-			}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
-			hedge{
-				name:         "delayed_hedge_p95wc",
-				delay:        interarrival_dist.GetPercentile(0.95),
-				cancellation: true,
-			}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
-			hedge{
-				name:         "perfect_hedge",
-				precision:    1,
-				cancellation: true,
-			}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
+			newHedge("naive_hedge", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
+				generated_app, generated_func, ts, service_time, copy_service_time,
+			),
+			newHedge("delayed_hedge_p95wc", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
+				generated_app, generated_func, ts, service_time, copy_service_time,
+			),
+			newHedge("perfect_hedge", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
+				generated_app, generated_func, ts, service_time, copy_service_time,
+			),
+			newHedge("assisted_hedge_90wc", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
+				generated_app, generated_func, ts, service_time, copy_service_time,
+			),
+			newHedge("assisted_hedge_90nc", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
+				generated_app, generated_func, ts, service_time, copy_service_time,
+			),
 		)
-
-		workload = append(
-			workload,
-			getAssistedHedges(generated_app, generated_func, ts, service_time, copy_service_time)...,
-		)
-
 	}
 	return workload
 }
@@ -118,20 +112,5 @@ func getBaseline(service_time, ts float64, generated_app, generated_func string)
 		strconv.FormatFloat(service_time, 'f', -1, 64),
 		"0",
 		"0",
-	}
-}
-
-func getAssistedHedges(generated_app, generated_func string, ts, service_time, copy_service_time float64) [][]string {
-	return [][]string{
-		hedge{
-			name:         "assisted_hedge_90wc",
-			precision:    0.9,
-			cancellation: true,
-		}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
-		hedge{
-			name:         "assisted_hedge_90nc",
-			precision:    0.9,
-			cancellation: false,
-		}.hedgedRequest(generated_app, generated_func, ts, service_time, copy_service_time),
 	}
 }

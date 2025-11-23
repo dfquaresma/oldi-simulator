@@ -6,8 +6,8 @@ Lightweight latency/distribution simulator for testing and performance analysis.
 
 Initialize modules (first run):
 ```bash
-go mod init oldi-simulator
-echo "replace github.com/dfquaresma/oldi-simulator => ./" >> go.mod
+go mod init hedge
+echo "replace github.com/dfquaresma/hedge => ./" >> go.mod
 go mod tidy
 ```
 
