@@ -65,15 +65,16 @@ func generate(requests_count int, f, interarrival_distname, servicetime_distname
 	if interarrival_dist == nil || servicetime_dist == nil {
 		panic(fmt.Sprintf("Either %s or %s for %s is not valid", interarrival_distname, servicetime_distname, f))
 	}
+	traffic := newTraffic(f, interarrival_dist, servicetime_dist)
 
 	ts := 0.0
 	generated_app := servicetime_distname + "_" + interarrival_distname + "-app"
 	generated_func := f
 	workload := [][]string{}
 	for i := 0; i < requests_count; i++ {
-		ts = ts + interarrival_dist.NextValue()
-		service_time := servicetime_dist.NextValue()
-		copy_service_time := servicetime_dist.NextValue()
+		ts += traffic.NextArrivalValue()
+		service_time := traffic.NextServiceValue()
+		copy_service_time := traffic.NextServiceValue()
 
 		workload = append(
 			workload,
@@ -85,12 +86,6 @@ func generate(requests_count int, f, interarrival_distname, servicetime_distname
 				generated_app, generated_func, ts, service_time, copy_service_time,
 			),
 			newHedge("perfect_hedge", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
-				generated_app, generated_func, ts, service_time, copy_service_time,
-			),
-			newHedge("assisted_hedge_90wc", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
-				generated_app, generated_func, ts, service_time, copy_service_time,
-			),
-			newHedge("assisted_hedge_90nc", interarrival_dist.GetPercentile(0.95)).hedgedRequest(
 				generated_app, generated_func, ts, service_time, copy_service_time,
 			),
 		)

@@ -1,8 +1,5 @@
 {
   "functions": [
-    "bernoulli_9510-const_5.0",
-    "bernoulli_9910-const_5.0",
-
     "weibull_k05λ5-const_5.0",
     "weibull_light-const_5.0",
     "weibull_medium-const_5.0",
@@ -10,7 +7,10 @@
 
     "lognormal_mu1sig1-const_5.0",
     "lognormal_super-const_5.0",
-    "lognormal_extreme-const_5.0"
+    "lognormal_extreme-const_5.0",
+
+    "heterogeneous_badcase",
+    "heterogeneous_goodcase"
   ],
 
   "outputPath": "../sim_results/latency_model/",
